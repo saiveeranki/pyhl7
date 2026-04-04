@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+venv/
+.env
+.idea/
+.vscode/
+.DS_Store
+logo.png.bak
+schema.json.bak
+test_engine.py
+# Temporary scripts
+extract_mappings.py

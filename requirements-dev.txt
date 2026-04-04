@@ -1,0 +1,6 @@
+# Development dependencies
+-r requirements.txt
+pytest
+pytest-cov
+black
+isort
