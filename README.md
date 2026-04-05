@@ -1,6 +1,6 @@
 # pyhl7: Advanced HL7 V2.x Message Engine for Python
 
-![pyhl7 Logo](logo.png)
+![pyhl7 Logo](https://raw.githubusercontent.com/saiveeranki/pyhl7/master/logo.png)
 
 `pyhl7` is a high-performance, version-aware HL7 v2.x parsing and data engineering engine for Python. Ported from the robust `rHL7` R package, it brings "Universal Caret Intelligence" and schema-driven segment handling to clinical data pipelines.
 
