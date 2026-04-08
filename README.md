@@ -11,6 +11,8 @@
 - **Dynamic Segment Properties**: Access any of the 100+ standard HL7 segments as a property (e.g., `msg.pid`, `msg.obr`, `msg.pv1`).
 - **Clinical Data Engineering**: Extract standardized medical records into flat [Pandas](https://pandas.pydata.org/) DataFrames with the `clinical_summary` property.
 - **Segment Writing**: Generate HL7-compliant strings from dictionary data using `write_segment`.
+- **Enterprise Batch Parsing**: Safely handle massive clinical data feeds with native support for stripping `FHS/BHS` (File/Batch Header) envelopes.
+- **Native ACK Generation**: Perform an automated "ACK Swap" to instantly generate standard `MSA` acknowledgments with synchronized routing IDs.
 
 ## Installation
 
@@ -58,6 +60,26 @@ print(new_msh)
 ```
 
 ## Advanced Usage
+
+### Enterprise Batch Processing
+Hospital feeds often bundle thousands of messages inside single files using Batch or File headers. Use the top-level `parse()` method to safely strip out these outer envelopes and return a clean list of `HL7Message` objects:
+
+```python
+from pyhl7 import parse
+
+raw_batch = "BHS|^~\\&|SENDER|RECEIVER|...\nMSH|...\nPID|...\nBTS|1"
+messages = parse(raw_batch) # Returns a List[HL7Message] if BHS/FHS is detected.
+```
+
+### Automated ACK Swap
+If you are building an integration endpoint, you need to acknowledge inbound messages. The `create_ack()` method automatically flips the Sending/Receiving applications and preserves the `MESSAGE_CONTROL_ID` for perfect synchronization:
+
+```python
+ack_string = msg.create_ack(ack_code="AA", text_message="Successfully injected into LIS.")
+print(ack_string)
+# MSH|...|RECEIVER|...|SENDER|...
+# MSA|AA|ORIGINAL_CONTROL_ID|Successfully injected into LIS.
+```
 
 ### Schema Customization
 `pyhl7` uses a centralized `schema.json` to map HL7 field names to indices. This ensures consistency across different HL7 versions and segments.
