@@ -76,3 +76,35 @@ def test_attribute_error():
     msg = HL7Message(HL7_V23)
     with pytest.raises(AttributeError):
         msg.not_a_segment_type_long_name
+
+def test_ack_generation():
+    msg = HL7Message(HL7_V23)
+    ack_str = msg.create_ack("AA", "Message Processed Successfully")
+    
+    msh_part = ack_str.split("\n")[0]
+    msa_part = ack_str.split("\n")[1]
+    
+    # Assert ACK Swap occurred
+    msh_fields = msh_part.split("|")
+    assert msh_fields[2] == "RECEIVING_APP"  # Sending App is now the original Receiver
+    assert msh_fields[4] == "SENDING_FAC"    # Receiving App is now the original Sender
+    assert msh_fields[8] == "ACK"            # Message Type changed to ACK
+    assert msh_fields[9] == "123456"         # Preserved Control ID
+    
+    # Assert MSA is linked correctly
+    msa_fields = msa_part.split("|")
+    assert msa_fields[0] == "MSA"
+    assert msa_fields[1] == "AA"
+    assert msa_fields[2] == "123456"         # Link to original Control ID
+    assert msa_fields[3] == "Message Processed Successfully"
+
+def test_batch_parsing():
+    batch_data = f"BHS|^~\\&|SENDER|RECEIVER|20231027\n{HL7_V23}\n{HL7_V25}\nBTS|2"
+    from pyhl7 import parse
+    
+    messages = parse(batch_data)
+    assert isinstance(messages, list)
+    assert len(messages) == 2
+    assert messages[0].version == "2.3"
+    assert messages[1].version == "2.5"
+    assert messages[0].msh.iloc[0]["MESSAGE_CONTROL_ID"] == "123456"

@@ -179,9 +179,87 @@ class HL7Message:
 
 
 
-def read_hl7(file_path: str, version: Optional[str] = None) -> HL7Message:
-    """Read an HL7 file and return an HL7Message object."""
+    def create_ack(self, ack_code: str = "AA", text_message: str = "") -> str:
+        """
+        Enterprise 'ACK Swap': Automatically generate a standard HL7 Acknowledgment.
+        Inverts Sending/Receiving applications and preserves the Message Control ID.
+        """
+        # Determine separators
+        msh_lines = self.get_segment_lines("MSH")
+        if not msh_lines:
+            raise ValueError("Cannot create ACK: Message has no MSH segment.")
+        
+        msh_orig = msh_lines[0].split("|")
+        field_sep = "|"
+        enc_chars = msh_orig[1] if len(msh_orig) > 1 else "^~\\&"
+        
+        # Extract routing info for the swap
+        # MSH-3 (Sending App), MSH-4 (Sending Fac), MSH-5 (Rec App), MSH-6 (Rec Fac)
+        snd_app = msh_orig[2] if len(msh_orig) > 2 else ""
+        snd_fac = msh_orig[3] if len(msh_orig) > 3 else ""
+        rec_app = msh_orig[4] if len(msh_orig) > 4 else ""
+        rec_fac = msh_orig[5] if len(msh_orig) > 5 else ""
+        
+        msg_control_id = msh_orig[9] if len(msh_orig) > 9 else ""
+        version = self.version
+        
+        from datetime import datetime
+        dt_str = datetime.now().strftime("%Y%m%d%H%M%S")
+        
+        # Build new MSH (Swap 3<->5 and 4<->6)
+        ack_msh = [
+            "MSH", enc_chars, rec_app, rec_fac, snd_app, snd_fac, dt_str, "",
+            "ACK", msg_control_id, "P", version
+        ]
+        
+        # Build MSA
+        ack_msa = ["MSA", ack_code, msg_control_id, text_message]
+        
+        return field_sep.join(ack_msh) + "\n" + field_sep.join(ack_msa)
+
+def parse(raw_data: str, version: Optional[str] = None) -> Any: # Returns Union[HL7Message, List[HL7Message]]
+    """
+    Enterprise entry point. Detects BHS/FHS envelopes and strips them to yield
+    a list of HL7Messages, or returns a single HL7Message if no batch headers found.
+    """
+    raw_data = raw_data.strip()
+    if not raw_data:
+        return HL7Message("")
+        
+    lines = [line.strip() for line in raw_data.split("\n") if line.strip()]
+    
+    # Check for Batch/File Headers
+    if lines[0].startswith("FHS|") or lines[0].startswith("BHS|"):
+        messages = []
+        current_msg_lines = []
+        
+        for line in lines:
+            # Skip header/trailer envelopes
+            if line.startswith("FHS|") or line.startswith("FTS|") or \
+               line.startswith("BHS|") or line.startswith("BTS|"):
+                continue
+                
+            if line.startswith("MSH|"):
+                # If we already have lines, compile previous message
+                if current_msg_lines:
+                    messages.append(HL7Message("\n".join(current_msg_lines), version))
+                    current_msg_lines = []
+            
+            # If we hit segments before an MSH in a batch, it's malformed, but we capture anyway
+            current_msg_lines.append(line)
+            
+        # Add the final trailing message
+        if current_msg_lines:
+            messages.append(HL7Message("\n".join(current_msg_lines), version))
+            
+        return messages
+        
+    # Standard single message parsing
+    return HL7Message(raw_data, version)
+
+def read_hl7(file_path: str, version: Optional[str] = None) -> Any:
+    """Read an HL7 file. Wraps the enterprise batch-aware parser."""
     with open(file_path, "r") as f:
         data = f.read()
-    return HL7Message(data, version)
+    return parse(data, version)
 
